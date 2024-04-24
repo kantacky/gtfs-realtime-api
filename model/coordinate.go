@@ -30,9 +30,15 @@ func (coordinate *Coordinate) Scan(value interface{}) error {
 	result = strings.ReplaceAll(result, "(", "")
 	result = strings.ReplaceAll(result, ")", "")
 	latLng := strings.Split(result, ",")
-	latitude, _ := strconv.ParseFloat(latLng[0], 32)
-	longitude, _ := strconv.ParseFloat(latLng[1], 32)
-	coordinate = &Coordinate{
+	latitude, err := strconv.ParseFloat(latLng[0], 32)
+	if err != nil {
+		return err
+	}
+	longitude, err := strconv.ParseFloat(latLng[1], 32)
+	if err != nil {
+		return err
+	}
+	*coordinate = Coordinate{
 		Latitude:  float32(latitude),
 		Longitude: float32(longitude),
 	}
