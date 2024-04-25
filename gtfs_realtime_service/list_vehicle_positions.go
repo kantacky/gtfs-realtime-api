@@ -40,7 +40,7 @@ func (s *GTFSRealtimeService) ListVehiclePositions(
 	timestampFrom := req.Msg.GetTimestamp().AsTime().Local().Add(-bufferDuration)
 	timestampTo := req.Msg.GetTimestamp().AsTime().Local()
 
-	schemaName := fmt.Sprintf("a%s", strings.ReplaceAll(req.Msg.GetAgencyId(), "-", ""))
+	schemaName := fmt.Sprintf("a%s", strings.ToLower(strings.ReplaceAll(req.Msg.GetAgencyId(), "-", "")))
 
 	results := []model.VehiclePosition{}
 	if err := gormDB.Select(
