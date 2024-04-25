@@ -3,25 +3,34 @@ package main
 import (
 	"fmt"
 	"log"
-	"net"
+	"net/http"
 
-	"github.com/kantacky/gtfs-realtime-api/server"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+	"connectrpc.com/grpcreflect"
+	"github.com/kantacky/apis-go/research/gtfs_realtime/v1/gtfs_realtimev1connect"
+	"github.com/kantacky/gtfs-realtime-api/gtfs_realtime_service"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
+const port = "8080"
+
 func main() {
-	port := 8080
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		panic(err)
-	}
+	mux := http.NewServeMux()
 
-	s := grpc.NewServer()
-	server.RegisterGTFSRealtimeServiceServer(s, server.New())
+	reflector := grpcreflect.NewStaticReflector(
+		gtfs_realtimev1connect.GTFSRealtimeServiceName,
+	)
+	mux.Handle(grpcreflect.NewHandlerV1(reflector))
 
-	reflection.Register(s)
+	gtfsRealtimeService := gtfs_realtime_service.New()
 
-	log.Printf("start gRPC server port: %v", port)
-	s.Serve(listener)
+	gtfsRealtimeServicePath, gtfsRealtimeServiceHandler := gtfs_realtimev1connect.NewGTFSRealtimeServiceHandler(gtfsRealtimeService)
+	mux.Handle(gtfsRealtimeServicePath, gtfsRealtimeServiceHandler)
+
+	log.Printf("Serving on http://127.0.0.1:%s\n", port)
+
+	http.ListenAndServe(
+		fmt.Sprintf(":%s", port),
+		h2c.NewHandler(mux, &http2.Server{}),
+	)
 }

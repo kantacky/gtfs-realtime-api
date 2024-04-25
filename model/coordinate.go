@@ -11,8 +11,8 @@ import (
 )
 
 type Coordinate struct {
-	Latitude  float32
-	Longitude float32
+	Latitude  float64
+	Longitude float64
 }
 
 func (coordinate *Coordinate) Scan(value interface{}) error {
@@ -39,8 +39,8 @@ func (coordinate *Coordinate) Scan(value interface{}) error {
 		return err
 	}
 	*coordinate = Coordinate{
-		Latitude:  float32(latitude),
-		Longitude: float32(longitude),
+		Latitude:  latitude,
+		Longitude: longitude,
 	}
 
 	return nil

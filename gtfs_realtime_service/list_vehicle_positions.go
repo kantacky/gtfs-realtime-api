@@ -1,4 +1,4 @@
-package server
+package gtfs_realtime_service
 
 import (
 	context "context"
@@ -8,14 +8,23 @@ import (
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
+	foundationv1 "github.com/kantacky/apis-go/kantacky/foundation/v1"
+	gtfs_realtimev1 "github.com/kantacky/apis-go/research/gtfs_realtime/v1"
 	"github.com/kantacky/gtfs-realtime-api/lib"
 	"github.com/kantacky/gtfs-realtime-api/model"
 )
 
-func (s *gtfsRealtimeServiceServer) ListVehiclePositions(
+func (s *GTFSRealtimeService) ListVehiclePositions(
 	ctx context.Context,
-	req *ListVehiclePositionsRequest,
-) (*ListVehiclePositionsResponse, error) {
+	req *connect.Request[gtfs_realtimev1.ListVehiclePositionsRequest],
+) (
+	res *connect.Response[gtfs_realtimev1.ListVehiclePositionsResponse],
+	err error,
+) {
+	res = connect.NewResponse(&gtfs_realtimev1.ListVehiclePositionsResponse{})
+	res.Header().Set("GTFSRealtime-Version", "v1")
+
 	db, err := lib.GetSQLDB()
 	if err != nil {
 		log.Fatalln("lib.GetSQLDB error:", err)
@@ -27,11 +36,11 @@ func (s *gtfsRealtimeServiceServer) ListVehiclePositions(
 		log.Fatalln("lib.GetGORMDB error:", err)
 	}
 
-	bufferSeconds := time.Duration(req.GetBufferSeconds()) * time.Second
-	timestampFrom := req.GetTimestamp().AsTime().Local().Add(-bufferSeconds)
-	timestampTo := req.GetTimestamp().AsTime().Local()
+	bufferDuration := time.Duration(req.Msg.GetBufferSeconds()) * time.Second
+	timestampFrom := req.Msg.GetTimestamp().AsTime().Local().Add(-bufferDuration)
+	timestampTo := req.Msg.GetTimestamp().AsTime().Local()
 
-	schemaName := fmt.Sprintf("a%s", strings.ReplaceAll(req.GetAgencyId(), "-", ""))
+	schemaName := fmt.Sprintf("a%s", strings.ReplaceAll(req.Msg.GetAgencyId(), "-", ""))
 
 	results := []model.VehiclePosition{}
 	if err := gormDB.Select(
@@ -52,11 +61,11 @@ func (s *gtfsRealtimeServiceServer) ListVehiclePositions(
 		return results[i].Timestamp.After(*results[j].Timestamp)
 	})
 
-	vehiclePositions := []*VehiclePosition{}
+	vehiclePositions := []*gtfs_realtimev1.VehiclePosition{}
 	for _, result := range results {
 		vehiclePositions = append(
 			vehiclePositions,
-			&VehiclePosition{
+			&gtfs_realtimev1.VehiclePosition{
 				Id:                   result.ID,
 				TripId:               result.TripID,
 				RouteId:              result.RouteID,
@@ -65,7 +74,7 @@ func (s *gtfsRealtimeServiceServer) ListVehiclePositions(
 				ScheduleRelationship: result.ScheduleRelationship,
 				VehicleId:            result.VehicleID,
 				VehicleLabel:         result.VehicleLabel,
-				VehiclePosition: &Coordinate{
+				VehiclePosition: &foundationv1.Coordinate{
 					Latitude:  result.VehiclePosition.Latitude,
 					Longitude: result.VehiclePosition.Longitude,
 				},
@@ -76,7 +85,10 @@ func (s *gtfsRealtimeServiceServer) ListVehiclePositions(
 		)
 	}
 
-	return &ListVehiclePositionsResponse{
+	res.Msg = &gtfs_realtimev1.ListVehiclePositionsResponse{
+		AgencyId:         req.Msg.GetAgencyId(),
 		VehiclePositions: vehiclePositions,
-	}, nil
+	}
+
+	return res, nil
 }
