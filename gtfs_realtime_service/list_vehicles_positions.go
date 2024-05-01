@@ -6,6 +6,7 @@ import (
 	"log"
 	"sort"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	foundationv1 "github.com/kantacky/apis-go/kantacky/foundation/v1"
@@ -14,14 +15,14 @@ import (
 	"github.com/kantacky/gtfs-realtime-api/model"
 )
 
-func (s *GTFSRealtimeService) ListVehiclePositions(
+func (s *GTFSRealtimeService) ListVehiclesPositions(
 	ctx context.Context,
-	req *connect.Request[gtfs_realtimev1.ListVehiclePositionsRequest],
+	req *connect.Request[gtfs_realtimev1.ListVehiclesPositionsRequest],
 ) (
-	res *connect.Response[gtfs_realtimev1.ListVehiclePositionsResponse],
+	res *connect.Response[gtfs_realtimev1.ListVehiclesPositionsResponse],
 	err error,
 ) {
-	res = connect.NewResponse(&gtfs_realtimev1.ListVehiclePositionsResponse{})
+	res = connect.NewResponse(&gtfs_realtimev1.ListVehiclesPositionsResponse{})
 	res.Header().Set("GTFSRealtime-Version", "v1")
 
 	db, err := lib.GetSQLDB()
@@ -35,25 +36,26 @@ func (s *GTFSRealtimeService) ListVehiclePositions(
 		log.Fatalln("lib.GetGORMDB error:", err)
 	}
 
-	timestampFrom := req.Msg.GetTimestampFrom().AsTime().Local()
-	timestampTo := req.Msg.GetTimestampTo().AsTime().Local()
-	vehicleID := req.Msg.GetVehicleId()
+	bufferDuration := time.Duration(req.Msg.GetBufferSeconds()) * time.Second
+	timestampFrom := req.Msg.GetTimestamp().AsTime().Local().Add(-bufferDuration)
+	timestampTo := req.Msg.GetTimestamp().AsTime().Local()
 
 	schemaName := fmt.Sprintf("a%s", strings.ToLower(strings.ReplaceAll(req.Msg.GetAgencyId(), "-", "")))
 
 	results := []model.VehiclePosition{}
-	if err := gormDB.Table(
+	if err := gormDB.Select(
+		"DISTINCT ON (vehicle_id) *",
+	).Table(
 		fmt.Sprintf("%s.vehicle_positions", schemaName),
 	).Where(
-		"timestamp >= ? AND timestamp <= ? AND vehicle_id = ?",
+		"timestamp >= ? AND timestamp <= ?",
 		lib.ISO8601(timestampFrom),
 		lib.ISO8601(timestampTo),
-		vehicleID,
 	).Order(
-		"timestamp DESC",
+		"vehicle_id ASC, timestamp DESC",
 	).Find(&results).Error; err != nil {
 		message := fmt.Sprintf("gormDB.Find error: %v", err)
-		res.Msg = &gtfs_realtimev1.ListVehiclePositionsResponse{
+		res.Msg = &gtfs_realtimev1.ListVehiclesPositionsResponse{
 			Result: &foundationv1.Result{
 				Status:  foundationv1.ResultStatus_RESULT_STATUS_FAILURE,
 				Message: &message,
@@ -90,7 +92,7 @@ func (s *GTFSRealtimeService) ListVehiclePositions(
 		)
 	}
 
-	res.Msg = &gtfs_realtimev1.ListVehiclePositionsResponse{
+	res.Msg = &gtfs_realtimev1.ListVehiclesPositionsResponse{
 		Result: &foundationv1.Result{
 			Status: foundationv1.ResultStatus_RESULT_STATUS_SUCCESS,
 		},

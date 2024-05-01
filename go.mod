@@ -6,11 +6,11 @@ require (
 	connectrpc.com/connect v1.16.1
 	connectrpc.com/grpcreflect v1.2.0
 	github.com/joho/godotenv v1.5.1
-	github.com/kantacky/apis-go v0.1.0
+	github.com/kantacky/apis-go v0.2.0
 	golang.org/x/net v0.24.0
-	google.golang.org/protobuf v1.33.0
+	google.golang.org/protobuf v1.34.0
 	gorm.io/driver/postgres v1.5.7
-	gorm.io/gorm v1.25.9
+	gorm.io/gorm v1.25.10
 )
 
 require (
